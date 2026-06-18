@@ -1,6 +1,8 @@
 "use client";
-import { Post, postsService } from "@/services/posts";
-import { useState } from "react";
+
+import { useOptimistic, useTransition } from "react";
+import { useToggleLike } from "@/hooks/use-toggle-like";
+import { Post } from "@/services/posts";
 
 interface Props {
   post: Post;
@@ -8,32 +10,41 @@ interface Props {
 }
 
 export function LikeButton({ post, inline = false }: Props) {
-  const [liked, setLiked] = useState(post.liked);
-  const [likes, setLikes] = useState(post.likes);
-  const [isPending, setIsPending] = useState(false);
+  const { mutateAsync, isPending } = useToggleLike(post.id);
+  const [isOptimisticPending, startTransition] = useTransition();
+  const [optimisticPost, setOptimisticPost] = useOptimistic(
+    post,
+    (currentPost, liked: boolean) => ({
+      ...currentPost,
+      liked,
+      likes: currentPost.likes + (liked ? 1 : -1),
+    }),
+  );
 
-  async function toggle() {
-    if (isPending) return;
-    const newLiked = !liked;
-    setIsPending(true);
-    try {
-      await postsService.toggleLike(post.id, newLiked);
-      setLiked(newLiked);
-      setLikes((l) => (newLiked ? l + 1 : l - 1));
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsPending(false);
-    }
-  }
+  const handleToggleLike = () => {
+    const nextLiked = !optimisticPost.liked;
+
+    startTransition(async () => {
+      setOptimisticPost(nextLiked);
+
+      try {
+        await mutateAsync(nextLiked);
+      } catch {
+        // useOptimistic rolls the UI back when the mutation fails.
+      }
+    });
+  };
+
+  const disabled = isPending || isOptimisticPending;
 
   if (inline) {
     return (
       <button
-        className={`like-btn ${liked ? "like-btn-active" : ""}`}
-        onClick={toggle}
+        className={`like-btn ${optimisticPost.liked ? "like-btn-active" : ""}`}
+        onClick={handleToggleLike}
+        disabled={disabled}
       >
-        {liked ? "♥" : "♡"} {likes}
+        {optimisticPost.liked ? "♥" : "♡"} {optimisticPost.likes}
       </button>
     );
   }
@@ -42,10 +53,11 @@ export function LikeButton({ post, inline = false }: Props) {
     <div className="flex items-center gap-3">
       <span className="text-sm font-medium">{post.title?.slice(0, 50)}</span>
       <button
-        className={`like-btn ${liked ? "like-btn-active" : ""}`}
-        onClick={toggle}
+        className={`like-btn ${optimisticPost.liked ? "like-btn-active" : ""}`}
+        onClick={handleToggleLike}
+        disabled={disabled}
       >
-        {liked ? "♥" : "♡"} {likes}
+        {optimisticPost.liked ? "♥" : "♡"} {optimisticPost.likes}
       </button>
     </div>
   );
