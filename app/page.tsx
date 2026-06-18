@@ -17,7 +17,7 @@ export default function Home() {
         <div className="blog-grid">
           <main>
             <CreatePostForm />
-            <PostList paginated />
+            <PostList />
           </main>
 
           <Sidebar />

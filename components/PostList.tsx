@@ -1,9 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
 import { SkeletonCards } from "./SkeletonCard";
 import { PostCards } from "./PostCards";
 import { PaginationPostList } from "./PaginationPostList";
-import { Post, postsService } from "@/services/posts";
+import { usePosts } from "@/hooks/use-posts";
 
 interface Props {
   paginated?: boolean;
@@ -11,28 +10,15 @@ interface Props {
 }
 
 function StaticFeed({ limit }: { limit: number }) {
-  const [data, setData] = useState<Post[]>([]);
-  const [isPending, setIsPending] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    postsService
-      .getAll()
-      .then((result) => {
-        setData(result?.data);
-        setError(null);
-      })
-      .catch(setError)
-      .finally(() => setIsPending(false));
-  }, []);
+  const { data, isPending, isError, error } = usePosts();
 
   if (isPending) return <SkeletonCards />;
-  if (error) return <p className="state-error">Lỗi: {error.message}</p>;
+  if (isError) return <p className="state-error">Lỗi: {error.message}</p>;
 
-  return <PostCards posts={data.slice(0, limit)} />;
+  return <PostCards posts={(data?.data ?? []).slice(0, limit)} />;
 }
 
-export function PostList({ paginated = false, limit = 10 }: Props) {
+export function PostList({ paginated = false, limit = 7 }: Props) {
   if (paginated) return <PaginationPostList />;
   return <StaticFeed limit={limit} />;
 }
